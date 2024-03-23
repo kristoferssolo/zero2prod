@@ -23,12 +23,12 @@ async fn subscribe_returns_200_for_valid_form_data() {
     let address = spawn_app().await;
     let configuration = get_configuration().expect("Failed to read configuration.");
     let db_url = configuration.database.to_string();
-    let connection = PgConnection::connect(&db_url)
+    let mut connection = PgConnection::connect(&db_url)
         .await
         .expect("Failed to connect to Postgres.");
     let client = Client::new();
 
-    let body = "name=kristofers%20solo&email=dev%40kristofers.solo";
+    let body = "name=Kristofers%20Solo&email=dev%40kristofers.solo";
     let response = client
         .post(&format!("{}/subscribtions", &address))
         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -38,6 +38,18 @@ async fn subscribe_returns_200_for_valid_form_data() {
         .expect("Failed to execute request.");
 
     assert_eq!(200, response.status().as_u16());
+    let saved = sqlx::query!(
+        r#"
+        SELECT email, name
+          FROM subscriptions
+    "#
+    )
+    .fetch_one(&mut connection)
+    .await
+    .expect("Failed to fetch saved subscription.");
+
+    assert_eq!(saved.email, "dev@kristofers.solo");
+    assert_eq!(saved.name, "Kristofers Solo");
 }
 
 #[tokio::test]
