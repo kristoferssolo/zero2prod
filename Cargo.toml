@@ -2,9 +2,30 @@
 name = "zero2prod"
 version = "0.1.0"
 edition = "2021"
+authors = ["Kristofers Solo <dev@kristofers.xyz>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "zero2prod"
 
 [dependencies]
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["trace"] }
+
+[dev-dependencies]
+tower = { version = "0.4", features = ["util"] }
+reqwest = "0.12"
+
+[package.metadata.clippy]
+warn = [
+    "clippy::pedantic",
+    "clippy::nursery",
+    "clippy::unwrap_used",
+    "clippy::expect_used",
+]
