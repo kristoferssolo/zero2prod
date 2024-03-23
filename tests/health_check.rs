@@ -1,5 +1,7 @@
 use reqwest::Client;
+use sqlx::{Connection, PgConnection};
 use tokio::net::TcpListener;
+use zero2prod::{configuation::get_configuration, routes::route};
 
 #[tokio::test]
 async fn health_check() {
@@ -19,6 +21,11 @@ async fn health_check() {
 #[tokio::test]
 async fn subscribe_returns_200_for_valid_form_data() {
     let address = spawn_app().await;
+    let configuration = get_configuration().expect("Failed to read configuration.");
+    let db_url = configuration.database.to_string();
+    let connection = PgConnection::connect(&db_url)
+        .await
+        .expect("Failed to connect to Postgres.");
     let client = Client::new();
 
     let body = "name=kristofers%20solo&email=dev%40kristofers.solo";
@@ -67,6 +74,6 @@ async fn spawn_app() -> String {
         .await
         .expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
-    let _ = tokio::spawn(async move { axum::serve(listener, zero2prod::app()).await.unwrap() });
+    let _ = tokio::spawn(async move { axum::serve(listener, route()).await.unwrap() });
     format!("http://127.0.0.1:{}", port)
 }
