@@ -1,12 +1,16 @@
 use reqwest::Client;
-use sqlx::{Connection, PgConnection};
+use sqlx::{postgres::PgPoolOptions, Connection, Executor, PgConnection, PgPool};
 use tokio::net::TcpListener;
-use zero2prod::{configuation::get_configuration, routes::route};
+use uuid::Uuid;
+use zero2prod::{
+    configuation::{get_configuration, DatabaseSettings},
+    routes::route,
+};
 
 #[tokio::test]
 async fn health_check() {
-    let address = spawn_app().await;
-    let url = format!("{}/health_check", &address);
+    let app = spawn_app().await;
+    let url = format!("{}/health_check", &app.address);
     let client = Client::new();
     let response = client
         .get(&url)
@@ -20,7 +24,7 @@ async fn health_check() {
 
 #[tokio::test]
 async fn subscribe_returns_200_for_valid_form_data() {
-    let address = spawn_app().await;
+    let app = spawn_app().await;
     let configuration = get_configuration().expect("Failed to read configuration.");
     let db_url = configuration.database.to_string();
     let mut connection = PgConnection::connect(&db_url)
@@ -30,7 +34,7 @@ async fn subscribe_returns_200_for_valid_form_data() {
 
     let body = "name=Kristofers%20Solo&email=dev%40kristofers.solo";
     let response = client
-        .post(&format!("{}/subscribtions", &address))
+        .post(&format!("{}/subscribtions", &app.address))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send()
@@ -42,7 +46,7 @@ async fn subscribe_returns_200_for_valid_form_data() {
         r#"
         SELECT email, name
           FROM subscriptions
-    "#
+        "#
     )
     .fetch_one(&mut connection)
     .await
@@ -54,7 +58,7 @@ async fn subscribe_returns_200_for_valid_form_data() {
 
 #[tokio::test]
 async fn subscribe_returns_400_when_data_is_missing() {
-    let address = spawn_app().await;
+    let app = spawn_app().await;
     let client = Client::new();
 
     let test_cases = vec![
@@ -65,7 +69,7 @@ async fn subscribe_returns_400_when_data_is_missing() {
 
     for (invalid_body, error_message) in test_cases {
         let response = client
-            .post(&format!("{}/subscribtions", &address))
+            .post(&format!("{}/subscribtions", &app.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(invalid_body)
             .send()
@@ -81,11 +85,57 @@ async fn subscribe_returns_400_when_data_is_missing() {
     }
 }
 
-async fn spawn_app() -> String {
+async fn spawn_app() -> TestApp {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
-    let _ = tokio::spawn(async move { axum::serve(listener, route()).await.unwrap() });
-    format!("http://127.0.0.1:{}", port)
+    let address = format!("http://127.0.0.1:{}", port);
+    let mut config = get_configuration().expect("Failed to read configuration.");
+
+    config.database.database_name = Uuid::new_v4().to_string();
+    let pool = configure_database(&config.database).await;
+    let pool_clone = pool.clone();
+    let _ = tokio::spawn(async move {
+        axum::serve(listener, route(pool_clone))
+            .await
+            .expect("Failed to bind address.")
+    });
+    TestApp { address, pool }
+}
+
+async fn configure_database(config: &DatabaseSettings) -> PgPool {
+    let mut connection = PgConnection::connect(&config.to_string_no_db())
+        .await
+        .expect("Failed to connect to Postgres.");
+
+    connection
+        .execute(
+            format!(
+                r#"
+                  CREATE DATABASE "{}"
+                "#,
+                config.database_name
+            )
+            .as_str(),
+        )
+        .await
+        .expect("Failed to create database.");
+
+    let pool = PgPoolOptions::new()
+        .connect(&config.to_string())
+        .await
+        .expect("Failed to connect to Postgres.");
+
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to migrate database");
+
+    pool
+}
+
+pub struct TestApp {
+    pub address: String,
+    pub pool: PgPool,
 }
