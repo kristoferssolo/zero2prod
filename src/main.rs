@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use secrecy::ExposeSecret;
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use zero2prod::{
@@ -14,7 +15,7 @@ async fn main() -> Result<(), std::io::Error> {
     init_subscriber(subscriber);
     let configuation = get_configuration().expect("Failed to read configuation.");
     let pool = PgPoolOptions::new()
-        .connect(&configuation.database.to_string())
+        .connect(&configuation.database.to_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres.");
     let addr = SocketAddr::from(([127, 0, 0, 1], configuation.application_port));
