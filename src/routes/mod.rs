@@ -13,6 +13,6 @@ pub use subscibtions::*;
 pub fn route(state: PgPool) -> Router {
     Router::new()
         .route("/health_check", get(health_check))
-        .route("/subscribtions", post(subscribe))
+        .route("/subscriptions", post(subscribe))
         .with_state(state)
 }
