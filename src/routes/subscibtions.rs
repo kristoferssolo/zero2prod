@@ -2,7 +2,7 @@ use axum::{extract::State, http::StatusCode, response::IntoResponse, Form};
 use chrono::Utc;
 use serde::Deserialize;
 use sqlx::PgPool;
-use tracing::{error, info_span, Instrument};
+use tracing::error;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -11,15 +11,31 @@ pub struct FormData {
     email: String,
 }
 
+#[tracing::instrument(
+    name = "Adding a new subscriber",
+    skip(form, pool),
+    fields(
+        request_id=%Uuid::new_v4(),
+        subscriber_email= %form.email,
+        subscriber_name = %form.name,
+    )
+)]
 pub async fn subscribe(
-    State(conn): State<PgPool>,
+    State(pool): State<PgPool>,
     Form(form): Form<FormData>,
 ) -> impl IntoResponse {
-    let request_id = Uuid::new_v4();
-    let request_span = info_span!("Adding a new subscriber", %request_id, subscriber_email = %form.email, subscriber_name = %form.name);
-    let _request_span_guard = request_span.enter();
-    let query_span = info_span!("Saving new subscriber details in the database");
-    match sqlx::query!(
+    match insert_subscriber(&pool, &form).await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+#[tracing::instrument(
+    name = "Saving new subscriber details in the database",
+    skip(form, pool)
+)]
+pub async fn insert_subscriber(pool: &PgPool, form: &FormData) -> Result<(), sqlx::Error> {
+    sqlx::query!(
         r#"
         INSERT INTO subscriptions(id, email, name, subscribed_at)
           VALUES ($1, $2, $3, $4)
@@ -29,14 +45,11 @@ pub async fn subscribe(
         form.name,
         Utc::now()
     )
-    .execute(&conn)
-    .instrument(query_span)
+    .execute(pool)
     .await
-    {
-        Ok(_) => StatusCode::OK,
-        Err(e) => {
-            error!("Failed to execute query: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        }
-    }
+    .map_err(|e| {
+        error!("Failed to execute query: {:?}", e);
+        e
+    })?;
+    Ok(())
 }
