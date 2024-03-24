@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use reqwest::Client;
 use sqlx::{postgres::PgPoolOptions, Connection, Executor, PgConnection, PgPool};
 use tokio::net::TcpListener;
@@ -5,6 +6,7 @@ use uuid::Uuid;
 use zero2prod::{
     configuation::{get_configuration, DatabaseSettings},
     routes::route,
+    telemetry::{get_subscriber, init_subscriber},
 };
 
 #[tokio::test]
@@ -85,7 +87,20 @@ async fn subscribe_returns_400_when_data_is_missing() {
     }
 }
 
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let default_filter_level = "info";
+    let subscriber_name = "test";
+    if std::env::var("TEST_LOG").is_ok() {
+        let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
+        init_subscriber(subscriber);
+    } else {
+        let subscriber = get_subscriber(default_filter_level, subscriber_name, std::io::sink);
+        init_subscriber(subscriber);
+    }
+});
+
 async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("Failed to bind random port");

@@ -10,7 +10,7 @@ use zero2prod::{
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    let subscriber = get_subscriber("zero2prod", "info");
+    let subscriber = get_subscriber("zero2prod", "info", std::io::stdout);
     init_subscriber(subscriber);
     let configuation = get_configuration().expect("Failed to read configuation.");
     let pool = PgPoolOptions::new()
