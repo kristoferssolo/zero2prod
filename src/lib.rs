@@ -1,3 +1,3 @@
-pub mod configuation;
+pub mod config;
 pub mod routes;
 pub mod telemetry;

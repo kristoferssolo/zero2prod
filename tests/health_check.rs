@@ -5,7 +5,7 @@ use sqlx::{postgres::PgPoolOptions, Connection, Executor, PgConnection, PgPool};
 use tokio::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::{
-    configuation::{get_configuration, DatabaseSettings},
+    config::{get_config, DatabaseSettings},
     routes::route,
     telemetry::{get_subscriber, init_subscriber},
 };
@@ -28,8 +28,8 @@ async fn health_check() {
 #[tokio::test]
 async fn subscribe_returns_200_for_valid_form_data() {
     let app = spawn_app().await;
-    let configuration = get_configuration().expect("Failed to read configuration.");
-    let mut connection = PgConnection::connect(&configuration.database.to_string().expose_secret())
+    let config = get_config().expect("Failed to read configuration.");
+    let mut connection = PgConnection::connect(&config.database.to_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres.");
     let client = Client::new();
@@ -106,7 +106,7 @@ async fn spawn_app() -> TestApp {
         .expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
-    let mut config = get_configuration().expect("Failed to read configuration.");
+    let mut config = get_config().expect("Failed to read configuration.");
 
     config.database.database_name = Uuid::new_v4().to_string();
     let pool = configure_database(&config.database).await;
