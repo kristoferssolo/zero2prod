@@ -1,7 +1,6 @@
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use secrecy::ExposeSecret;
-use sqlx::{postgres::PgPoolOptions, Connection, Executor, PgConnection, PgPool};
+use sqlx::{Connection, Executor, PgConnection, PgPool};
 use tokio::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::{
@@ -29,7 +28,7 @@ async fn health_check() {
 async fn subscribe_returns_200_for_valid_form_data() {
     let app = spawn_app().await;
     let config = get_config().expect("Failed to read configuration.");
-    let mut connection = PgConnection::connect(&config.database.to_string().expose_secret())
+    let mut connection = PgConnection::connect_with(&config.database.with_db())
         .await
         .expect("Failed to connect to Postgres.");
     let client = Client::new();
@@ -120,7 +119,7 @@ async fn spawn_app() -> TestApp {
 }
 
 async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let mut connection = PgConnection::connect(&config.to_string_no_db().expose_secret())
+    let mut connection = PgConnection::connect_with(&config.without_db())
         .await
         .expect("Failed to connect to Postgres.");
 
@@ -137,8 +136,7 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("Failed to create database.");
 
-    let pool = PgPoolOptions::new()
-        .connect(&config.to_string().expose_secret())
+    let pool = PgPool::connect_with(config.with_db())
         .await
         .expect("Failed to connect to Postgres.");
 
