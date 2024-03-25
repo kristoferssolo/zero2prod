@@ -27,13 +27,14 @@ async fn health_check() {
 #[tokio::test]
 async fn subscribe_returns_200_for_valid_form_data() {
     let app = spawn_app().await;
+    let body = "name=Kristofers%20Solo&email=dev%40kristofers.solo";
+
     let config = get_config().expect("Failed to read configuration.");
     let mut connection = PgConnection::connect_with(&config.database.with_db())
         .await
         .expect("Failed to connect to Postgres.");
     let client = Client::new();
 
-    let body = "name=Kristofers%20Solo&email=dev%40kristofers.solo";
     let response = client
         .post(&format!("{}/subscriptions", &app.address))
         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -53,8 +54,8 @@ async fn subscribe_returns_200_for_valid_form_data() {
     .await
     .expect("Failed to fetch saved subscription.");
 
-    assert_eq!(saved.email, "dev@kristofers.solo");
     assert_eq!(saved.name, "Kristofers Solo");
+    assert_eq!(saved.email, "dev@kristofers.solo");
 }
 
 #[tokio::test]
@@ -86,8 +87,35 @@ async fn subscribe_returns_400_when_data_is_missing() {
     }
 }
 
+#[tokio::test]
+async fn subscribe_returns_400_when_fields_are_present_but_invalid() {
+    let app = spawn_app().await;
+    let client = Client::new();
+    let test_cases = vec![
+        ("name=&email=dev%40kristofers.solo", "empty name"),
+        ("name=kristofers%20solo&email=", "empty email"),
+        ("name=solo&email=definetely-not-an-email", "invalid email"),
+    ];
+
+    for (body, description) in test_cases {
+        let response = client
+            .post(&format!("{}/subscriptions", &app.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+        assert_eq!(
+            400,
+            response.status().as_u16(),
+            "The API did not return 400 Bad Request when the payload was {}.",
+            description
+        );
+    }
+}
+
 static TRACING: Lazy<()> = Lazy::new(|| {
-    let default_filter_level = "info";
+    let default_filter_level = "trace";
     let subscriber_name = "test";
     if std::env::var("TEST_LOG").is_ok() {
         let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
@@ -105,9 +133,11 @@ async fn spawn_app() -> TestApp {
         .expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
+
     let mut config = get_config().expect("Failed to read configuration.");
 
     config.database.database_name = Uuid::new_v4().to_string();
+
     let pool = configure_database(&config.database).await;
     let pool_clone = pool.clone();
     let _ = tokio::spawn(async move {
