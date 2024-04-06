@@ -5,6 +5,7 @@ use tokio::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::{
     config::{get_config, DatabaseSettings},
+    email_client::EmailClient,
     routes::route,
     telemetry::{get_subscriber, init_subscriber},
 };
@@ -140,8 +141,19 @@ async fn spawn_app() -> TestApp {
 
     let pool = configure_database(&config.database).await;
     let pool_clone = pool.clone();
+
+    let sender_email = config
+        .email_client
+        .sender()
+        .expect("Invalid sender email adress");
+    let email_client = EmailClient::new(
+        config.email_client.base_url,
+        sender_email,
+        config.email_client.auth_token,
+    );
+
     let _ = tokio::spawn(async move {
-        axum::serve(listener, route(pool_clone))
+        axum::serve(listener, route(pool_clone, email_client))
             .await
             .expect("Failed to bind address.")
     });

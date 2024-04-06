@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use tracing::error;
 use uuid::Uuid;
 
-use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
+use crate::domain::NewSubscriber;
 
 #[derive(Deserialize)]
 pub struct FormData {

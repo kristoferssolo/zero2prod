@@ -8,10 +8,13 @@ use sqlx::{
     ConnectOptions,
 };
 
+use crate::domain::SubscriberEmail;
+
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
+    pub email_client: EmailClientSettings,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,6 +39,18 @@ pub struct ApplicationSettings {
 pub enum Environment {
     Local,
     Production,
+}
+#[derive(Debug, Deserialize)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_email: String,
+    pub auth_token: Secret<String>,
+}
+
+impl EmailClientSettings {
+    pub fn sender(&self) -> Result<SubscriberEmail, String> {
+        self.sender_email.clone().try_into()
+    }
 }
 
 pub fn get_config() -> Result<Settings, config::ConfigError> {

@@ -19,11 +19,14 @@ use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::{info_span, Span};
 use uuid::Uuid;
 
-pub fn route(state: PgPool) -> Router {
+use crate::email_client::EmailClient;
+
+pub fn route(pool: PgPool, email_client: EmailClient) -> Router {
     Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
-        .with_state(state)
+        .with_state(pool)
+        .with_state(email_client)
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {

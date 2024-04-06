@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use validator::validate_email;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SubscriberEmail(String);
 
 impl TryFrom<String> for SubscriberEmail {
