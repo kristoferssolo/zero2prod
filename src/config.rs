@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, time::Duration};
 
 use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
@@ -45,11 +45,16 @@ pub struct EmailClientSettings {
     pub base_url: String,
     pub sender_email: String,
     pub auth_token: Secret<String>,
+    pub timeout_milliseconds: u64,
 }
 
 impl EmailClientSettings {
     pub fn sender(&self) -> Result<SubscriberEmail, String> {
         self.sender_email.clone().try_into()
+    }
+
+    pub fn timeout(&self) -> Duration {
+        Duration::from_millis(self.timeout_milliseconds)
     }
 }
 

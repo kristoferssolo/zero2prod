@@ -12,3 +12,4 @@ database_name = "newsletter"
 base_url = "localhost"
 sender_email = "test@gmail.com"
 auth_token = "super-secret-token"
+timeout_milliseconds = 10000

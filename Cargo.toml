@@ -18,7 +18,7 @@ axum = "0.7"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 config = { version = "0.14", features = ["toml"], default-features = false }
 serde = { version = "1", features = ["derive"] }
-sqlx = { version = "0.7", default-features = false, features = [
+sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio",
     "tls-rustls",
     "macros",
